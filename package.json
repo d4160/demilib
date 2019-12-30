@@ -1,0 +1,25 @@
+{
+  "name": "demigiant.dotween",
+  "displayName": "DemiLib",
+  "version": "0.1.191230-preview",
+  "unity": "2017.1",
+  "description": "Various utility libraries for Unity (alpha).",
+  "keywords": [
+    "C#",
+    "utility"
+  ],
+  "author": {
+    "name": "Daniele Giardini"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Demigiant/demilib.git"
+  },
+  "samples": [
+    {
+      "displayName": "DemiLib Examples",
+      "description": "A serie of examples and use cases.",
+      "path": "Samples~"
+    }
+  ]
+}
