@@ -99,13 +99,23 @@ namespace DG.DemiEditor
         /// Sets the background of the style
         /// </summary>
         public static GUIStyle Background(this GUIStyle style, Texture2D background, Texture2D pressBackground = null)
+        { return Background(style, background, pressBackground, null); }
+        /// <summary>
+        /// Sets the background of the style
+        /// </summary>
+        public static GUIStyle Background(this GUIStyle style, Texture2D background, Texture2D pressBackground, Texture2D overBackground)
         {
             if (background == null) background = DeStylePalette.transparent;
             if (pressBackground == null) pressBackground = background;
-            style.normal.background = style.onNormal.background
-                = style.focused.background = style.onFocused.background
-                = style.hover.background = style.onHover.background = background;
+            if (overBackground == null) overBackground = background;
+            style.normal.background = style.onNormal.background = background;
+            style.normal.scaledBackgrounds = style.onNormal.scaledBackgrounds = new Texture2D[0];
+            style.focused.background = style.onFocused.background
+                = style.hover.background = style.onHover.background = overBackground;
+            style.focused.scaledBackgrounds = style.onFocused.scaledBackgrounds
+                = style.hover.scaledBackgrounds = style.onHover.scaledBackgrounds = new Texture2D[0];
             style.active.background = style.onActive.background = pressBackground;
+            style.active.scaledBackgrounds = style.onActive.scaledBackgrounds = new Texture2D[0];
             return style;
         }
 

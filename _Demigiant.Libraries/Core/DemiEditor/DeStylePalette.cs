@@ -112,8 +112,12 @@ namespace DG.DemiEditor
         static Texture2D _whiteDot_whiteBorderAlpha;
         static Texture2D _circle;
         public static Texture2D ico_demigiant { get { return LoadTexture(ref _ico_demigiant, "ico_demigiant", FilterMode.Bilinear, 16); } }
+        public static Texture2D ico_lock { get { return LoadTexture(ref _ico_lock, "ico_lock"); } }
+        public static Texture2D ico_lock_open { get { return LoadTexture(ref _ico_lock_open, "ico_lock_open"); } }
         public static Texture2D ico_visibility { get { return LoadTexture(ref _ico_visibility_on, "ico_visibility"); } }
         public static Texture2D ico_visibility_off { get { return LoadTexture(ref _ico_visibility_off, "ico_visibility_off"); } }
+        public static Texture2D ico_flipV { get { return LoadTexture(ref _ico_flipV, "ico_flipV"); } }
+        public static Texture2D ico_optionsDropdown { get { return LoadTexture(ref _ico_optionsDropdown, "ico_optionsDropdown"); } }
         public static Texture2D ico_foldout_open { get { return LoadTexture(ref _ico_foldout_open, "ico_foldout_open"); } }
         public static Texture2D ico_foldout_closed { get { return LoadTexture(ref _ico_foldout_closed, "ico_foldout_closed"); } }
         public static Texture2D ico_nodeArrow { get { return LoadTexture(ref _ico_nodeArrow, "ico_nodeArrow", FilterMode.Bilinear, 16); } }
@@ -162,8 +166,12 @@ namespace DG.DemiEditor
         public static Texture2D tileBars_slanted { get { return LoadTexture(ref _tileBars_slanted, "tileBars_slanted", FilterMode.Point, 32, TextureWrapMode.Repeat); } }
         public static Texture2D tileBars_slanted_alpha { get { return LoadTexture(ref _tileBars_slanted_alpha, "tileBars_slanted_alpha", FilterMode.Point, 32, TextureWrapMode.Repeat); } }
         static Texture2D _ico_demigiant;
+        static Texture2D _ico_lock;
+        static Texture2D _ico_lock_open;
         static Texture2D _ico_visibility_on;
         static Texture2D _ico_visibility_off;
+        static Texture2D _ico_flipV;
+        static Texture2D _ico_optionsDropdown;
         static Texture2D _ico_foldout_open;
         static Texture2D _ico_foldout_closed;
         static Texture2D _ico_nodeArrow;
@@ -339,6 +347,7 @@ namespace DG.DemiEditor
                         toolFoldoutOpen, toolFoldoutOpenWLabel, toolFoldoutOpenWStretchedLabel,
                         toolLFoldoutClosed, toolLFoldoutClosedWLabel, toolLFoldoutClosedWStretchedLabel,
                         toolLFoldoutOpen, toolLFoldoutOpenWLabel, toolLFoldoutOpenWStretchedLabel,
+                        foldoutClosedWLabel, foldoutOpenWLabel,
                         bBlankBorder, bBlankBorderCompact,
                         flatWhite, transparent;
 
@@ -346,16 +355,17 @@ namespace DG.DemiEditor
         {
             def = new GUIStyle(GUI.skin.button);
             tool = new GUIStyle(EditorStyles.toolbarButton).ContentOffsetY(-1);
+            if (DeGUI.usesInterFont) tool.Height((int)(tool.fixedHeight - 3));
             toolNoFixedH = new GUIStyle(EditorStyles.toolbarButton).ContentOffsetY(-1).Height(0);
             toolL = new GUIStyle(EditorStyles.toolbarButton).Height(23).ContentOffsetY(0);
             toolS = new GUIStyle(EditorStyles.toolbarButton).Height(13).ContentOffsetY(0).Padding(0);
             toolIco = new GUIStyle(tool).StretchWidth(false).Width(22).ContentOffsetX(-1);
             toolFoldoutClosed = new GUIStyle(GUI.skin.button) {
                 alignment = TextAnchor.MiddleLeft,
-                active = { background = null },
+                active = { background = DeStylePalette.transparent, scaledBackgrounds = new Texture2D[0] },
                 fixedWidth = 14,
 //                normal = { background = EditorStyles.foldout.normal.background },
-                normal = { background = DeStylePalette.ico_foldout_closed },
+                normal = { background = DeStylePalette.ico_foldout_closed, scaledBackgrounds = new Texture2D[0] },
                 border = EditorStyles.foldout.border,
                 padding = new RectOffset(14, 0, 0, 0),
                 margin = new RectOffset(0, 3, 0, 0),
@@ -364,15 +374,15 @@ namespace DG.DemiEditor
                 contentOffset = new Vector2(2, -1),
                 richText = true
             };
-            toolFoldoutClosedWLabel = toolFoldoutClosed.Clone(9).Width(0).StretchWidth(false);
+            toolFoldoutClosedWLabel = toolFoldoutClosed.Clone(DeGUI.usesInterFont ? 11 : 9).Width(0).StretchWidth(false);
             toolFoldoutClosedWStretchedLabel = toolFoldoutClosedWLabel.Clone().StretchWidth();
             toolFoldoutOpen = new GUIStyle(toolFoldoutClosed) {
 //                normal = { background = EditorStyles.foldout.onNormal.background }
-                normal = { background = DeStylePalette.ico_foldout_open }
+                normal = { background = DeStylePalette.ico_foldout_open, scaledBackgrounds = new Texture2D[0] }
             };
             toolFoldoutOpenWLabel = new GUIStyle(toolFoldoutClosedWLabel) {
 //                normal = { background = EditorStyles.foldout.onNormal.background }
-                normal = { background = DeStylePalette.ico_foldout_open }
+                normal = { background = DeStylePalette.ico_foldout_open, scaledBackgrounds = new Texture2D[0] }
             };
             toolFoldoutOpenWStretchedLabel = toolFoldoutOpenWLabel.Clone().StretchWidth();
             // Large
@@ -382,6 +392,9 @@ namespace DG.DemiEditor
             toolLFoldoutOpen = toolFoldoutOpen.Clone().OverflowTop(-4);
             toolLFoldoutOpenWLabel = toolFoldoutOpenWLabel.Clone().OverflowTop(-4);
             toolLFoldoutOpenWStretchedLabel = toolFoldoutOpenWStretchedLabel.Clone().OverflowTop(-4);
+            //
+            foldoutOpenWLabel = toolFoldoutOpenWStretchedLabel.Clone(12);
+            foldoutClosedWLabel = toolFoldoutClosedWStretchedLabel.Clone(12);
             // Custom using squareBorder
             bBlankBorder = new GUIStyle(GUI.skin.button).Add(TextAnchor.MiddleCenter, Color.white).Background(DeStylePalette.squareBorderCurved)
                 .Padding(5, 4, 1, 2).Border(new RectOffset(4, 4, 4, 4)).Overflow(-1, -1, 0, 0).ContentOffsetX(-1);
@@ -404,10 +417,11 @@ namespace DG.DemiEditor
             rightAligned = new GUIStyle(GUI.skin.label).Add(TextAnchor.MiddleRight);
             wordwrap = new GUIStyle(GUI.skin.label).Add(Format.WordWrap);
             wordwrapRichtText = wordwrap.Clone(Format.RichText);
-            toolbar = new GUIStyle(GUI.skin.label).Add(9).ContentOffset(new Vector2(-2, 1));
+            toolbar = new GUIStyle(GUI.skin.label).Add(DeGUI.usesInterFont ? 11 : 9)
+                .ContentOffset(new Vector2(-2, DeGUI.usesInterFont ? -1 : 1));
             toolbarRightAligned = toolbar.Clone(TextAnchor.MiddleRight);
             toolbarL = new GUIStyle(toolbar).ContentOffsetY(3);
-            toolbarS = new GUIStyle(toolbar).Add(8, FontStyle.Bold).ContentOffsetY(-2);
+            toolbarS = new GUIStyle(toolbar).Add(DeGUI.usesInterFont ? 10 : 8, FontStyle.Bold).ContentOffsetY(-2);
             toolbarBox = new GUIStyle(toolbar).ContentOffsetY(0);
         }
     }

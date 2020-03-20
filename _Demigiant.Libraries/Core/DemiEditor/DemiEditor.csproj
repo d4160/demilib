@@ -42,11 +42,11 @@
     <Reference Include="System" />
     <Reference Include="System.Xml" />
     <Reference Include="UnityEditor">
-      <HintPath>C:\Program Files (x86)\Unity\4.6\Editor\Data\Managed\UnityEditor.dll</HintPath>
+      <HintPath>C:\Program Files\Unity\Hub\Editor\5.4.6\Editor\Data\Managed\UnityEditor.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>C:\Program Files (x86)\Unity\4.6\Editor\Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>C:\Program Files\Unity\Hub\Editor\5.4.6\Editor\Data\Managed\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
@@ -84,21 +84,25 @@
     <Compile Include="DeGUINodeSystem\SelectionManager.cs" />
     <Compile Include="DeGUINodeSystem\zzLegacy\Legacy_Connector.cs" />
     <Compile Include="AttributesManagers\DeScriptExecutionOrderManager.cs" />
+    <Compile Include="DeEditorReflectionUtils.cs" />
     <Compile Include="DeScrollView.cs" />
     <Compile Include="DeSkinStyle.cs" />
     <Compile Include="DeEditorSoundUtils.cs" />
+    <Compile Include="DeStopwatch.cs" />
     <Compile Include="DeUnityEditorVersion.cs" />
     <Compile Include="Extensions\AssemblyExtensions.cs" />
     <Compile Include="Extensions\GUIStyleExtensions.cs" />
     <Compile Include="DeStylePalette.cs" />
     <Compile Include="DeGUILayout.cs" />
     <Compile Include="DeGUI.cs" />
-    <Compile Include="Extensions\Internal\ColorExtensions.cs" />
-    <Compile Include="Extensions\Internal\ListExtensions.cs" />
-    <Compile Include="Extensions\Internal\RectExtensions.cs" />
+    <Compile Include="Extensions\ColorExtensions.cs" />
+    <Compile Include="Extensions\GUIContentExtensions.cs" />
+    <Compile Include="Extensions\ListExtensions.cs" />
+    <Compile Include="Extensions\RectExtensions.cs" />
     <Compile Include="Extensions\SerializedPropertyExtensions.cs" />
     <Compile Include="Extensions\StringExtensions.cs" />
     <Compile Include="Extensions\TextureExtensions.cs" />
+    <Compile Include="Extensions\UnityEventExtensions.cs" />
     <Compile Include="Panels\TexturePreviewWindow.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Format.cs" />

@@ -1,6 +1,7 @@
 ﻿// Author: Daniele Giardini - http://www.demigiant.com
 // Created: 2015/04/24 18:27
 
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
@@ -18,6 +19,11 @@ namespace DG.DemiEditor
     /// </summary>
     public static class DeGUI
     {
+        enum ButtonState
+        {
+            Normal, Hover, Pressed
+        }
+
         /// <summary>
         /// Default color palette
         /// </summary>
@@ -29,13 +35,36 @@ namespace DG.DemiEditor
         /// <summary>TRUE if we're using the PRO skin</summary>
         public static readonly bool IsProSkin;
         public static Color defaultGUIColor, defaultGUIBackgroundColor, defaultGUIContentColor; // Set on Begin GUI
+        public static int defaultFontSize { get; private set; } // Set on Begin GUI
+        public static bool usesInterFont { get; private set; } // Set on Begin GUI: new default font added in Unity 2019.3
+        public static readonly GUIContent MixedValueLabel = new GUIContent("—");
+        public static bool isMouseDown { get; private set; }
+
         static DeColorPalette _defaultColorPalette; // Default color palette if none selected
         static DeStylePalette _defaultStylePalette; // Default style palette if none selected
         static string _doubleClickTextFieldId; // ID of selected double click textField
         static int _activePressButtonId = -1;
         static int _pressFrame = -1;
         static bool _hasEditorPressUpdateActive = false;
-        static MethodInfo _defaultPropertyFieldMInfo;
+        static readonly Dictionary<Rect, ButtonState> _ButtonRectToState = new Dictionary<Rect, ButtonState>();
+        static MethodInfo _miDefaultPropertyField {
+            get {
+                if (_foo_miDefaultPropertyField == null) {
+                    _foo_miDefaultPropertyField = typeof(EditorGUI).GetMethod("DefaultPropertyField", BindingFlags.Static | BindingFlags.NonPublic);
+                }
+                return _foo_miDefaultPropertyField;
+            }
+        }
+        static MethodInfo _foo_miDefaultPropertyField;
+        static FieldInfo _fiChangedStack {
+            get {
+                if (_foo_fiChangedStack == null) {
+                    _foo_fiChangedStack = typeof(EditorGUI).GetField("s_ChangedStack", BindingFlags.Static | BindingFlags.NonPublic);
+                }
+                return _foo_fiChangedStack;
+            }
+        }
+        static FieldInfo _foo_fiChangedStack;
 
         static DeGUI()
         {
@@ -68,6 +97,17 @@ namespace DG.DemiEditor
             defaultGUIColor = GUI.color;
             defaultGUIBackgroundColor = GUI.backgroundColor;
             defaultGUIContentColor = GUI.contentColor;
+            defaultFontSize = GUI.skin.label.fontSize;
+            usesInterFont = DeUnityEditorVersion.Version >= 2019.3f && (GUI.skin.label.font == null);
+
+            switch (Event.current.rawType) {
+            case EventType.MouseDown:
+                isMouseDown = true;
+                break;
+            case EventType.MouseUp:
+                isMouseDown = false;
+                break;
+            }
         }
 
         /// <summary>
@@ -151,6 +191,40 @@ namespace DG.DemiEditor
             TexturePreviewWindow.Open(texture);
         }
 
+        #endregion
+
+        #region Methods
+
+        static ButtonState GetButtonState(Rect r)
+        {
+            if (!_ButtonRectToState.ContainsKey(r)) _ButtonRectToState.Add(r, ButtonState.Normal);
+            return _ButtonRectToState[r];
+        }
+
+        static void SetButtonState(Rect r, ButtonState state)
+        {
+            if (_ButtonRectToState.ContainsKey(r)) _ButtonRectToState[r] = state;
+            else _ButtonRectToState.Add(r, state);
+        }
+
+        #endregion
+
+        #region Scopes
+
+        public class MixedValueScope : DeScope
+        {
+            readonly bool _prevMixedValue;
+            public MixedValueScope(bool showMixedValue = true)
+            {
+                _prevMixedValue = EditorGUI.showMixedValue;
+                EditorGUI.showMixedValue = showMixedValue;
+            }
+            protected override void CloseScope()
+            {
+                EditorGUI.showMixedValue = _prevMixedValue;
+            }
+        }
+
         public class LabelFieldWidthScope : DeScope
         {
             readonly float _prevLabelWidth;
@@ -225,11 +299,160 @@ namespace DG.DemiEditor
             }
         }
 
+        /// <summary>
+        /// Wrapper to set serialized fields with multiple sources selected: automatically sets GUI to show mixed values when necessary
+        /// and contains a fieldInfo <see cref="FieldInfo"/> which is set within the wrapper.<para/>
+        /// Note that you must set the <see cref="value"/> property within the wrapper so that it's assigned correctly when closing the scope.
+        /// </summary>
+        public class MultiPropertyScope : DeScope
+        {
+            public readonly FieldInfo fieldInfo;
+            public readonly bool hasMixedValue;
+            public readonly bool isGenericSerializedProperty; // Not supported (usually UnityEvents)
+            public object value;
+            readonly IList _sources;
+            readonly bool _prevShowMixedValue;
+            readonly bool _isSerializedPropertyMode;
+            readonly bool _requiresSpecialEndChangeCheck;
+            readonly List<SerializedProperty> _fieldsAsSerializedProperties;
+
+            /// <summary>Multi property scope</summary>
+            /// <param name="fieldName">Name of the field so it can be found and set/get via Reflection</param>
+            /// <param name="sources">List of the sources containing the given field</param>
+            /// <param name="requiresSpecialEndChangeCheck">If TRUE validates EditorGUI.EndChangeCheck before calling it
+            /// (fixes an issue which happens with advanced Undo usage in DOTween Timeline and ColorFields)</param>
+            public MultiPropertyScope(
+                string fieldName, IList sources, List<SerializedProperty> fieldsAsSerializedProperties = null,
+                bool requiresSpecialEndChangeCheck = false
+            ){
+                _sources = sources;
+                fieldInfo = GetFieldInfo(fieldName, sources);
+                _prevShowMixedValue = EditorGUI.showMixedValue;
+                _requiresSpecialEndChangeCheck = requiresSpecialEndChangeCheck;
+                EditorGUI.BeginChangeCheck();
+                EditorGUI.showMixedValue = hasMixedValue = HasMixedValue(fieldInfo, _sources);
+                if (fieldsAsSerializedProperties != null) {
+                    _isSerializedPropertyMode = true;
+                    _fieldsAsSerializedProperties = fieldsAsSerializedProperties;
+                    isGenericSerializedProperty = _fieldsAsSerializedProperties[0].propertyType == SerializedPropertyType.Generic;
+                    for (int i = 0; i < _fieldsAsSerializedProperties.Count; ++i) _fieldsAsSerializedProperties[i].serializedObject.Update();
+                }
+            }
+
+            protected override void CloseScope()
+            {
+                EditorGUI.showMixedValue = _prevShowMixedValue;
+                if (_requiresSpecialEndChangeCheck) {
+                    Stack<bool> changeStack = (Stack<bool>)_fiChangedStack.GetValue(null);
+                    if (changeStack.Count > 0 && !EditorGUI.EndChangeCheck()) return;
+                } else if (!EditorGUI.EndChangeCheck()) return;
+                if (_isSerializedPropertyMode) {
+                    if (isGenericSerializedProperty) {
+                        // Update only first one that might have changed, ignore others
+                        _fieldsAsSerializedProperties[0].serializedObject.ApplyModifiedProperties();
+                    } else {
+                        object value = null;
+                        for (int i = 0; i < _fieldsAsSerializedProperties.Count; ++i) {
+                            if (i == 0) value = _fieldsAsSerializedProperties[i].GetValue();
+                            else _fieldsAsSerializedProperties[i].SetValue(value);
+                            _fieldsAsSerializedProperties[i].serializedObject.ApplyModifiedProperties();
+                        }
+                    }
+                } else {
+                    try {
+                        for (int i = 0; i < _sources.Count; ++i) fieldInfo.SetValue(_sources[i], value);
+                    } catch {
+                        // Means the value was only shown not set (like in case of toggle buttons that are set later by custom code)
+                    }
+                }
+            }
+
+            static FieldInfo GetFieldInfo(string fieldName, IList targets)
+            {
+                return targets[0].GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            }
+
+            static bool HasMixedValue(FieldInfo fInfo, IList targets)
+            {
+                object defValue = null;
+                for (int i = 0; i < targets.Count; ++i) {
+                    if (i == 0) defValue = fInfo.GetValue(targets[i]);
+                    else if (!fInfo.GetValue(targets[i]).Equals(defValue)) return true;
+                }
+                return false;
+            }
+        }
+
         #endregion
 
         #region Public GUI Draw Methods
 
         #region Buttons
+
+        /// <summary>
+        /// A button that triggers an immediate repaint when hovered/pressed/unhovered
+        /// (which otherwise doesn't happen if you apply a background to the button's GUIStyle).<para/>
+        /// Requires <see cref="EditorWindow.wantsMouseMove"/> to be activated.
+        /// </summary>
+        public static bool ActiveButton(Rect rect, GUIContent content, GUIStyle guiStyle = null)
+        {
+            ButtonState lastState = GetButtonState(rect);
+            ButtonState currState = !rect.Contains(Event.current.mousePosition)
+                ? ButtonState.Normal : isMouseDown ? ButtonState.Pressed : ButtonState.Hover;
+            bool result = GUI.Button(rect, content, guiStyle);
+            if (lastState != currState) {
+                SetButtonState(rect, currState);
+                DeEditorPanelUtils.RepaintCurrentEditor();
+            }
+            return result;
+        }
+        /// <summary>
+        /// A button that triggers an immediate repaint when hovered/pressed/unhovered
+        /// (which otherwise doesn't happen if you apply a background to the button's GUIStyle)
+        /// and also assigns different GUI colors based on the button's state and the given one.<para/>
+        /// Requires <see cref="EditorWindow.wantsMouseMove"/> to be activated.
+        /// </summary>
+        /// <param name="rect">Rect</param>
+        /// <param name="content">Content</param>
+        /// <param name="onNormal">Default color</param>
+        /// <param name="guiStyle">Style</param>
+        public static bool ActiveButton(Rect rect, GUIContent content, Color onNormal, GUIStyle guiStyle)
+        { return ActiveButton(rect, content, onNormal, null, null, guiStyle); }
+        /// <summary>
+        /// A button that triggers an immediate repaint when hovered/pressed/unhovered
+        /// (which otherwise doesn't happen if you apply a background to the button's GUIStyle)
+        /// and also assigns different GUI colors based on the button's state with options to eventually auto-generate them.<para/>
+        /// Requires <see cref="EditorWindow.wantsMouseMove"/> to be activated.
+        /// </summary>
+        /// <param name="rect">Rect</param>
+        /// <param name="content">Content</param>
+        /// <param name="onNormal">Default color</param>
+        /// <param name="onHover">Hover color (if NULL auto-generates it from the given one by making it brighter</param>
+        /// <param name="onPressed">Pressed color (if NULL auto-generates it from the given one by making it even brighter</param>
+        /// <param name="guiStyle">Style</param>
+        public static bool ActiveButton(
+            Rect rect, GUIContent content, Color onNormal, Color? onHover = null, Color? onPressed = null, GUIStyle guiStyle = null
+        ){
+            bool result;
+            Color color = onNormal;
+            ButtonState lastState = GetButtonState(rect);
+            ButtonState currState = !rect.Contains(Event.current.mousePosition)
+                ? ButtonState.Normal : isMouseDown ? ButtonState.Pressed : ButtonState.Hover;
+            switch (currState) {
+            case ButtonState.Hover:
+                color = onHover != null ? (Color)onHover : onNormal.CloneAndChangeBrightness(1.15f);
+                break;
+            case ButtonState.Pressed:
+                color = onPressed != null ? (Color)onPressed : onNormal.CloneAndChangeBrightness(1.3f);
+                break;
+            }
+            using (new ColorScope(color)) result = GUI.Button(rect, content, guiStyle);
+            if (lastState != currState) {
+                SetButtonState(rect, currState);
+                DeEditorPanelUtils.RepaintCurrentEditor();
+            }
+            return result;
+        }
 
         /// <summary>Shaded button</summary>
         public static bool ShadedButton(Rect rect, Color shade, string text)
@@ -288,6 +511,22 @@ namespace DG.DemiEditor
                         : stretchedLabel ? DeGUI.styles.button.toolFoldoutClosedWStretchedLabel : DeGUI.styles.button.toolFoldoutClosedWLabel;
             }
             bool clicked = GUI.Button(rect, text, style);
+            if (clicked) {
+                toggled = !toggled;
+                GUI.changed = true;
+            }
+            return toggled;
+        }
+        /// <summary>Foldout button + label (not intended to be used in toolbar) which allows click-to-foldout/foldin</summary>
+        public static bool FoldoutLabel(Rect rect, bool toggled, GUIContent label = null)
+        {
+            bool hasLabel = label != null && !string.IsNullOrEmpty(label.text);
+            GUIStyle style = !hasLabel
+                ? toggled ? styles.button.toolFoldoutOpen : styles.button.toolFoldoutClosed
+                : toggled
+                    ? styles.button.foldoutOpenWLabel
+                    : styles.button.foldoutClosedWLabel;
+            bool clicked = GUI.Button(rect, hasLabel ? label : GUIContent.none, style);
             if (clicked) {
                 toggled = !toggled;
                 GUI.changed = true;
@@ -478,8 +717,7 @@ namespace DG.DemiEditor
         /// </summary>
         public static void DefaultPropertyField(Rect position, SerializedProperty property, GUIContent label)
         {
-            if (_defaultPropertyFieldMInfo == null) _defaultPropertyFieldMInfo = typeof(EditorGUI).GetMethod("DefaultPropertyField", BindingFlags.Static | BindingFlags.NonPublic);
-            _defaultPropertyFieldMInfo.Invoke(null, new object[] { position, property, label });
+            _miDefaultPropertyField.Invoke(null, new object[] { position, property, label });
         }
 
         /// <summary>Draws a colored square</summary>
@@ -642,6 +880,397 @@ namespace DG.DemiEditor
             if (color != null) GUI.backgroundColor = (Color)color;
             GUI.Box(rect, "", DeGUI.styles.box.flat);
             GUI.backgroundColor = prevBgColor;
+        }
+
+        /// <summary>Draws a Vector3Field that can have single axes disabled</summary>
+        public static Vector2 Vector2FieldAdvanced(
+            Rect rect, GUIContent label, Vector2 value, bool xEnabled, bool yEnabled, bool lockAllToX, bool lockAllToY
+        ){
+            if (label.HasText()) rect = EditorGUI.PrefixLabel(rect, label);
+            Rect axisR = rect.SetWidth((rect.width - 2) / 2);
+            using (new LabelFieldWidthScope(10)) {
+                for (int i = 0; i < 2; ++i) {
+                    bool wasGuiEnabled = GUI.enabled;
+                    switch (i) {
+                    case 0:
+                        GUI.enabled = wasGuiEnabled && xEnabled;
+                        EditorGUI.BeginChangeCheck();
+                        value.x = EditorGUI.FloatField(axisR, "X", value.x);
+                        if (EditorGUI.EndChangeCheck() && lockAllToX) value.y = value.x;
+                        break;
+                    case 1:
+                        GUI.enabled = wasGuiEnabled && yEnabled;
+                        EditorGUI.BeginChangeCheck();
+                        value.y = EditorGUI.FloatField(axisR, "Y", value.y);
+                        if (EditorGUI.EndChangeCheck() && lockAllToY) value.x = value.y;
+                        break;
+                    }
+                    GUI.enabled = wasGuiEnabled;
+                    axisR = axisR.Shift(axisR.width + 2, 0, 0, 0);
+                }
+            }
+            return value;
+        }
+
+        /// <summary>Draws a Vector3Field that can have single axes disabled</summary>
+        public static Vector3 Vector3FieldAdvanced(
+            Rect rect, GUIContent label, Vector3 value, bool xEnabled, bool yEnabled, bool zEnabled, bool lockAllToX, bool lockAllToY, bool lockAllToZ
+        )
+        {
+            if (label.HasText()) rect = EditorGUI.PrefixLabel(rect, label);
+            Rect axisR = rect.SetWidth((rect.width - 4) / 3);
+            using (new LabelFieldWidthScope(10)) {
+                for (int i = 0; i < 3; ++i) {
+                    bool wasGuiEnabled = GUI.enabled;
+                    switch (i) {
+                    case 0:
+                        GUI.enabled = wasGuiEnabled && xEnabled;
+                        EditorGUI.BeginChangeCheck();
+                        value.x = EditorGUI.FloatField(axisR, "X", value.x);
+                        if (EditorGUI.EndChangeCheck() && lockAllToX) value.y = value.z = value.x;
+                        break;
+                    case 1:
+                        GUI.enabled = wasGuiEnabled && yEnabled;
+                        EditorGUI.BeginChangeCheck();
+                        value.y = EditorGUI.FloatField(axisR, "Y", value.y);
+                        if (EditorGUI.EndChangeCheck() && lockAllToY) value.x = value.z = value.y;
+                        break;
+                    case 2:
+                        GUI.enabled = wasGuiEnabled && zEnabled;
+                        EditorGUI.BeginChangeCheck();
+                        value.z = EditorGUI.FloatField(axisR, "Z", value.z);
+                        if (EditorGUI.EndChangeCheck() && lockAllToZ) value.x = value.y = value.z;
+                        break;
+                    }
+                    GUI.enabled = wasGuiEnabled;
+                    axisR = axisR.Shift(axisR.width + 2, 0, 0, 0);
+                }
+            }
+            return value;
+        }
+
+        /// <summary>Draws a Vector3Field that can have single axes disabled</summary>
+        public static Vector4 Vector4FieldAdvanced(
+            Rect rect, GUIContent label, Vector4 value, bool xEnabled, bool yEnabled, bool zEnabled, bool wEnabled,
+            bool lockAllToX, bool lockAllToY, bool lockAllToZ, bool lockAllToW
+        ){
+            if (label.HasText()) rect = EditorGUI.PrefixLabel(rect, label);
+            Rect axisR = rect.SetWidth((rect.width - 6) / 4);
+            using (new LabelFieldWidthScope(10)) {
+                for (int i = 0; i < 4; ++i) {
+                    bool wasGuiEnabled = GUI.enabled;
+                    switch (i) {
+                    case 0:
+                        GUI.enabled = wasGuiEnabled && xEnabled;
+                        EditorGUI.BeginChangeCheck();
+                        value.x = EditorGUI.FloatField(axisR, "X", value.x);
+                        if (EditorGUI.EndChangeCheck() && lockAllToX) value.y = value.z = value.w = value.x;
+                        break;
+                    case 1:
+                        GUI.enabled = wasGuiEnabled && yEnabled;
+                        EditorGUI.BeginChangeCheck();
+                        value.y = EditorGUI.FloatField(axisR, "Y", value.y);
+                        if (EditorGUI.EndChangeCheck() && lockAllToY) value.x = value.z = value.w = value.y;
+                        break;
+                    case 2:
+                        GUI.enabled = wasGuiEnabled && zEnabled;
+                        EditorGUI.BeginChangeCheck();
+                        value.z = EditorGUI.FloatField(axisR, "Z", value.z);
+                        if (EditorGUI.EndChangeCheck() && lockAllToZ) value.x = value.y = value.w = value.z;
+                        break;
+                    case 3:
+                        GUI.enabled = wasGuiEnabled && wEnabled;
+                        EditorGUI.BeginChangeCheck();
+                        value.w = EditorGUI.FloatField(axisR, "W", value.w);
+                        if (EditorGUI.EndChangeCheck() && lockAllToW) value.x = value.y = value.z = value.w;
+                        break;
+                    }
+                    GUI.enabled = wasGuiEnabled;
+                    axisR = axisR.Shift(axisR.width + 2, 0, 0, 0);
+                }
+            }
+            return value;
+        }
+
+        #endregion
+
+        #region MixedValue GUI
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiColorField(Rect rect, GUIContent label, string fieldName, IList sources)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources, null, true)) {
+                mScope.value = EditorGUI.ColorField(rect, label, (Color)mScope.fieldInfo.GetValue(sources[0]));
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiColorFieldAdvanced(Rect rect, GUIContent label, string fieldName, IList sources, bool alphaOnly)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources, null, true)) {
+                if (alphaOnly) {
+                    Color color = (Color)mScope.fieldInfo.GetValue(sources[0]);
+                    color.a = EditorGUI.Slider(rect, label, ((Color)mScope.fieldInfo.GetValue(sources[0])).a, 0, 1);
+                    mScope.value = color;
+                } else {
+                    mScope.value = EditorGUI.ColorField(rect, label, (Color)mScope.fieldInfo.GetValue(sources[0]));
+                }
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiCurveField(Rect rect, GUIContent label, string fieldName, IList sources)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = EditorGUI.CurveField(rect, label, (AnimationCurve)mScope.fieldInfo.GetValue(sources[0]));
+                if (mScope.hasMixedValue) {
+                    // Draw over curve field because Unity has no default way to show mixed values on them
+                    DrawTiledTexture(rect.Contract(2), DeStylePalette.tileBars_empty, 0.25f, new Color(0.97f, 0.81f, 0.02f, 0.5f));
+                }
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values. Supports using an int as an enum</summary>
+        public static bool MultiEnumPopup<T>(Rect rect, GUIContent label, string fieldName, IList sources) where T : Enum
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                bool isIntMode = mScope.fieldInfo.FieldType == typeof(int);
+                mScope.value = EditorGUI.EnumPopup(rect, label, (T)mScope.fieldInfo.GetValue(sources[0]));
+                if (isIntMode) mScope.value = (int)mScope.value;
+                return mScope.hasMixedValue;
+            }
+        }
+        /// <summary>Returns TRUE if there's mixed values. Supports using an int as an enum</summary>
+        public static bool MultiEnumPopup(Rect rect, GUIContent label, Type enumType, string fieldName, IList sources)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                bool isIntMode = mScope.fieldInfo.FieldType == typeof(int);
+                object parsed = Enum.Parse(enumType, mScope.fieldInfo.GetValue(sources[0]).ToString());
+                mScope.value = EditorGUI.EnumPopup(rect, label, parsed as Enum);
+                if (isIntMode) mScope.value = (int)mScope.value;
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiFloatField(Rect rect, GUIContent label, string fieldName, IList sources, float? min = null, float? max = null)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                EditorGUI.BeginChangeCheck();
+                mScope.value = EditorGUI.FloatField(rect, label, (float)mScope.fieldInfo.GetValue(sources[0]));
+                if (EditorGUI.EndChangeCheck()) {
+                    if (min != null && (float)mScope.value < (float)min) mScope.value = min;
+                    else if (max != null && (float)mScope.value > (float)max) mScope.value = max;
+                }
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values. Supports also uint fields</summary>
+        public static bool MultiIntField(Rect rect, GUIContent label, string fieldName, IList sources, int? min = null, int? max = null)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                bool isUintMode = mScope.fieldInfo.FieldType == typeof(uint);
+                bool isFloatMode = !isUintMode && mScope.fieldInfo.FieldType == typeof(float);
+                EditorGUI.BeginChangeCheck();
+                mScope.value = EditorGUI.IntField(rect, label,
+                    isUintMode
+                        ? (int)(uint)mScope.fieldInfo.GetValue(sources[0])
+                        : isFloatMode
+                            ? (int)(float)mScope.fieldInfo.GetValue(sources[0])
+                            : (int)mScope.fieldInfo.GetValue(sources[0])
+                );
+                if (EditorGUI.EndChangeCheck()) {
+                    if (min != null && (int)mScope.value < (int)min) mScope.value = min;
+                    else if (max != null && (int)mScope.value > (int)max) mScope.value = max;
+                    if (isUintMode) {
+                        if ((int)mScope.value < 0) mScope.value = (uint)0;
+                        else mScope.value = (uint)(int)mScope.value;
+                    } else if (isFloatMode) mScope.value = (float)(int)mScope.value;
+                }
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiIntSlider(Rect rect, GUIContent label, string fieldName, IList sources, int min, int max)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = EditorGUI.IntSlider(rect, label, (int)mScope.fieldInfo.GetValue(sources[0]), min, max);
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values. Auto-determines object type from the field's type</summary>
+        public static bool MultiObjectField(Rect rect, GUIContent label, string fieldName, IList sources, bool allowSceneObjects)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = EditorGUI.ObjectField(
+                    rect, label, (Object)mScope.fieldInfo.GetValue(sources[0]), mScope.fieldInfo.FieldType, allowSceneObjects
+                );
+                return mScope.hasMixedValue;
+            }
+        }
+        /// <summary>Returns TRUE if there's mixed values. Forces field to accept only objects of the given type</summary>
+        public static bool MultiObjectField(Rect rect, GUIContent label, string fieldName, IList sources, Type objType, bool allowSceneObjects)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = EditorGUI.ObjectField(
+                    rect, label, (Object)mScope.fieldInfo.GetValue(sources[0]), objType, allowSceneObjects
+                );
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiRectField(Rect rect, GUIContent label, string fieldName, IList sources)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = EditorGUI.RectField(rect, label, (Rect)mScope.fieldInfo.GetValue(sources[0]));
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiSlider(Rect rect, GUIContent label, string fieldName, IList sources, float min, float max)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = EditorGUI.Slider(rect, label, (float)mScope.fieldInfo.GetValue(sources[0]), min, max);
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiTextArea(Rect rect, string fieldName, IList sources)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = EditorGUI.TextArea(rect, (string)mScope.fieldInfo.GetValue(sources[0]));
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiTextField(Rect rect, GUIContent label, string fieldName, IList sources)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = EditorGUI.TextField(rect, label, (string)mScope.fieldInfo.GetValue(sources[0]));
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values. Supports passing int values as bool (1 = true, 0 = false)</summary>
+        public static bool MultiToggleButton(Rect rect, GUIContent label, string fieldName, IList sources, GUIStyle guiStyle = null)
+        { return MultiToggleButton(rect, null, label, fieldName, sources, null, null, null, null, guiStyle); }
+        /// <summary>Returns TRUE if there's mixed values. Supports passing int values as bool (1 = true, 0 = false)</summary>
+        public static bool MultiToggleButton(
+            Rect rect, GUIContent label, string fieldName, IList sources,
+            Color? bgOffColor, Color? bgOnColor = null, Color? contentOffColor = null, Color? contenOnColor = null,  GUIStyle guiStyle = null
+        ){ return MultiToggleButton(rect, null, label, fieldName, sources, bgOffColor, bgOnColor, contentOffColor, contenOnColor, guiStyle); }
+        /// <summary>Returns TRUE if there's mixed values. Supports passing int values as bool (1 = true, 0 = false)</summary>
+        public static bool MultiToggleButton(
+            Rect rect, bool? forceSetToggle, GUIContent label, string fieldName, IList sources,
+            Color? bgOffColor, Color? bgOnColor = null, Color? contentOffColor = null, Color? contenOnColor = null,  GUIStyle guiStyle = null
+        ){
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                bool intMode = mScope.fieldInfo.FieldType == typeof(int);
+                mScope.value = ToggleButton(rect,
+                    forceSetToggle == null
+                        ? intMode
+                            ? (int)mScope.fieldInfo.GetValue(sources[0]) == 1
+                            : (bool)mScope.fieldInfo.GetValue(sources[0])
+                        : (bool)forceSetToggle,
+                    mScope.hasMixedValue ? MixedValueLabel : label,
+                    bgOffColor == null ? (Color)colors.bg.toggleOff : (Color)bgOffColor,
+                    bgOnColor == null ? (Color)colors.bg.toggleOn : (Color)bgOnColor,
+                    contentOffColor == null ? (Color)colors.content.toggleOff : (Color)contentOffColor,
+                    contenOnColor == null ? (Color)colors.content.toggleOn : (Color)contenOnColor,
+                    guiStyle
+                );
+                if (intMode) mScope.value = (bool)mScope.value ? 1 : 0;
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values. Requires a SerializedProperty representation of each UnityEven field</summary>
+        public static bool MultiUnityEvent(
+            Rect rect, GUIContent label, string fieldName, IList sources, List<SerializedProperty> fieldsAsSerializedProperties
+        ){
+            using (var mScope = new MultiPropertyScope(fieldName, sources, fieldsAsSerializedProperties)) {
+                EditorGUI.BeginDisabledGroup(mScope.hasMixedValue); // Unity events can't be set when multiple
+                if (label.HasText()) EditorGUI.PropertyField(rect, fieldsAsSerializedProperties[0], label);
+                else EditorGUI.PropertyField(rect, fieldsAsSerializedProperties[0]);
+                EditorGUI.EndDisabledGroup();
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiVector2Field(Rect rect, GUIContent label, string fieldName, IList sources)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = EditorGUI.Vector2Field(rect, label, (Vector2)mScope.fieldInfo.GetValue(sources[0]));
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiVector3Field(Rect rect, GUIContent label, string fieldName, IList sources)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = EditorGUI.Vector3Field(rect, label, (Vector3)mScope.fieldInfo.GetValue(sources[0]));
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiVector4Field(Rect rect, GUIContent label, string fieldName, IList sources)
+        {
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = EditorGUI.Vector4Field(rect, label.text, (Vector4)mScope.fieldInfo.GetValue(sources[0]));
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiVector2FieldAdvanced(
+            Rect rect, GUIContent label, string fieldName, IList sources, bool xEnabled, bool yEnabled, bool lockAllToX, bool lockAllToY
+        ){
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = Vector2FieldAdvanced(
+                    rect, label, (Vector2)mScope.fieldInfo.GetValue(sources[0]), xEnabled, yEnabled, lockAllToX, lockAllToY
+                );
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiVector3FieldAdvanced(
+            Rect rect, GUIContent label, string fieldName, IList sources, bool xEnabled, bool yEnabled, bool zEnabled,
+            bool lockAllToX, bool lockAllToY, bool lockAllToZ
+        ){
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = Vector3FieldAdvanced(
+                    rect, label, (Vector3)mScope.fieldInfo.GetValue(sources[0]), xEnabled, yEnabled, zEnabled, lockAllToX, lockAllToY, lockAllToZ
+                );
+                return mScope.hasMixedValue;
+            }
+        }
+
+        /// <summary>Returns TRUE if there's mixed values</summary>
+        public static bool MultiVector4FieldAdvanced(
+            Rect rect, GUIContent label, string fieldName, IList sources, bool xEnabled, bool yEnabled, bool zEnabled, bool wEnabled,
+            bool lockAllToX, bool lockAllToY, bool lockAllToZ, bool lockAllToW
+        ){
+            using (var mScope = new MultiPropertyScope(fieldName, sources)) {
+                mScope.value = Vector4FieldAdvanced(
+                    rect, label, (Vector4)mScope.fieldInfo.GetValue(sources[0]), xEnabled, yEnabled, zEnabled, wEnabled,
+                    lockAllToX, lockAllToY, lockAllToZ, lockAllToW
+                );
+                return mScope.hasMixedValue;
+            }
         }
 
         #endregion
