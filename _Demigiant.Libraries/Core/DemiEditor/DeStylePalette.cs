@@ -24,6 +24,7 @@ namespace DG.DemiEditor
         public readonly MiscStyles misc = new MiscStyles();
 
         protected bool initialized;
+        protected bool initializedAsInterfont;
 
         // ADB path to Imgs directory, final slash included
         static string _adbImgsDir {
@@ -266,12 +267,14 @@ namespace DG.DemiEditor
         /// <summary>
         /// Called automatically by <code>DeGUI.BeginGUI</code>.
         /// Override when adding new style subclasses.
+        /// Returns TRUE if the styles were initialized or re-initialized
         /// </summary>
-        internal void Init()
+        internal bool Init()
         {
-            if (initialized) return;
+            if (initialized && initializedAsInterfont == DeGUI.usesInterFont) return false;
 
             initialized = true;
+            initializedAsInterfont = DeGUI.usesInterFont;
 
             // Unity 2018 (bug with non-centered content) ► change default styles then reapply them after init
             Vector2 def_toolbarBtContentOffset = GUI.skin.button.contentOffset;
@@ -296,12 +299,21 @@ namespace DG.DemiEditor
                 // Unity 2018 ► Reassign default styles
                 EditorStyles.toolbarButton.contentOffset = def_toolbarBtContentOffset;
             }
+
+            return true;
         }
 
         static Texture2D LoadTexture(ref Texture2D property, string name, FilterMode filterMode = FilterMode.Point, int maxTextureSize = 32, TextureWrapMode wrapMode = TextureWrapMode.Clamp)
         {
             if (property == null) {
-                property = AssetDatabase.LoadAssetAtPath(String.Format("{0}{1}.png", _adbImgsDir, name), typeof(Texture2D)) as Texture2D;
+                property = AssetDatabase.LoadAssetAtPath(string.Format("{0}{1}.png", _adbImgsDir, name), typeof(Texture2D)) as Texture2D;
+                if (property == null) {
+                    // Look inside package manager folder
+                    property = AssetDatabase.LoadAssetAtPath(string.Format(
+                        "Packages/com.demigiant.demilib/Demigiant/DemiLib/Core/Editor/Imgs/{0}.png",
+                        name
+                    ), typeof(Texture2D)) as Texture2D;
+                }
                 property.SetGUIFormat(filterMode, maxTextureSize, wrapMode);
             }
             return property;

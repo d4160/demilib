@@ -109,6 +109,12 @@
             <param name="s">string to replace</param>
             <param name="minLength">Minimum length for considering the string valid</param>
         </member>
+        <member name="M:DG.DemiEditor.DeEditorFileUtils.FilePathIsWithinUnityProjectAssets(System.String)">
+            <summary>
+            Returns TRUE if the given filepath is within this Unity project Assets folder
+            </summary>
+            <param name="fullFilePath">Full file path</param>
+        </member>
         <member name="M:DG.DemiEditor.DeEditorFileUtils.ConvertToValidFilename(System.String,System.Char)">
             <summary>
             Returns the given string stripped of any invalid filename characters.<para/>
@@ -171,6 +177,34 @@
             <summary>
             Precisely returns the last controlId assigned to a GUI element
             </summary>
+        </member>
+        <member name="T:DG.DemiEditor.DeEditorPackageManager">
+            <summary>
+            Utils to manage UnityPackages import/export and file mirroring
+            </summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeEditorPackageManager.WriteFileListTo(System.String,System.String)">
+            <summary>
+            Stores all file paths (excluding metas) found in the given AssetDatabase directory and subdirectory
+            into the given AssetDatabase file (which will be created if missing),
+            writing them as relative to the given directory.<para/>
+            EXAMPLE:<para/>
+            <code>adbReadFromDirPath = "Plugins/DOTween"<para/>
+            file "Assets/Plugins/DOTween/aScript.cs" stored as "aScript.cs"<para/>
+            file "Assets/Plugins/DOTween/Subdir/aScript.cs" stored as "Subdir/aScript.cs"<para/>
+            </code>
+            </summary>
+            <param name="adbWriteToFilePath">AssetDatabase path ("Assets/...") where the list should be written</param>
+            <param name="adbReadFromDirPath">AssetDatabase path ("Assets/...") from which the list of files should be retrieved, without final slash</param>
+        </member>
+        <member name="M:DG.DemiEditor.DeEditorPackageManager.ParseListAndRemoveExtraFiles(System.String,System.String,System.String,System.Boolean)">
+            <summary>
+            Parses a file list created via <see cref="M:DG.DemiEditor.DeEditorPackageManager.WriteFileListTo(System.String,System.String)"/> and removes any files not present in the list from the given directory
+            </summary>
+            <param name="label">Label to use when logging the result</param>
+            <param name="adbListFilePath">AssetDatabase path ("Assets/...") to the file containing the list</param>
+            <param name="adbParseDirPath">AssetDatabase path ("Assets/...") to the directory to parse for extra files to remove</param>
+            <param name="simulate">If TRUE only returns a report log and doesn't actually delete the files</param>
         </member>
         <member name="T:DG.DemiEditor.DeEditorPanelUtils">
             <summary>
@@ -257,6 +291,13 @@
         <member name="M:DG.DemiEditor.DeEditorUtils.GetGameViewSize">
             <summary>
             Return the size of the editor game view, eventual extra bars excluded (meaning the true size of the game area)
+            </summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeEditorUtils.GetEditorUIScaling">
+            <summary>
+            Returns a value from 1 to N (2 for 200% scaling) indicating the UI Scaling of Unity's editor.
+            The first time this is called it will store the scaling and keep it without refreshing,
+            since you need to restart Unity in order to apply a scaling change
             </summary>
         </member>
         <member name="M:DG.DemiEditor.DeEditorUtils.ClearConsole">
@@ -1126,6 +1167,7 @@
             <summary>
             Called automatically by <code>DeGUI.BeginGUI</code>.
             Override when adding new style subclasses.
+            Returns TRUE if the styles were initialized or re-initialized
             </summary>
         </member>
         <member name="T:DG.DemiEditor.DeStyleSubPalette">
@@ -1426,7 +1468,8 @@
         </member>
         <member name="M:DG.DemiEditor.DeGUI.BeginGUI(DG.DemiLib.DeColorPalette,DG.DemiEditor.DeStylePalette)">
             <summary>
-            Call this at the beginning of GUI methods
+            Call this at the beginning of GUI methods.
+            Returns TRUE if the styles were initialized or re-initialized
             </summary>
             <param name="guiColorPalette">Eventual <see cref="T:DG.DemiLib.DeColorPalette"/> to use</param>
             <param name="guiStylePalette">Eventual <see cref="T:DG.DemiEditor.DeStylePalette"/> to use</param>
@@ -1455,7 +1498,8 @@
         <member name="M:DG.DemiEditor.DeGUI.ChangePalette(DG.DemiLib.DeColorPalette,DG.DemiEditor.DeStylePalette)">
             <summary>
             Changes the active palettes to the given ones
-            (or resets them to the default ones if NULL)
+            (or resets them to the default ones if NULL).
+            Returns TRUE if the styles were initialized or re-initialized
             </summary>
         </member>
         <member name="M:DG.DemiEditor.DeGUI.ResetGUIColors(System.Boolean,System.Boolean,System.Boolean)">
