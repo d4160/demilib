@@ -44,6 +44,7 @@ namespace DG.DemiEditor
         static DeStylePalette _defaultStylePalette; // Default style palette if none selected
         static string _doubleClickTextFieldId; // ID of selected double click textField
         static int _activePressButtonId = -1;
+        static readonly HashSet<int> _ActiveDownButtonsIds = new HashSet<int>();
         static int _pressFrame = -1;
         static bool _hasEditorPressUpdateActive = false;
         static readonly Dictionary<Rect, ButtonState> _ButtonRectToState = new Dictionary<Rect, ButtonState>();
@@ -143,6 +144,14 @@ namespace DG.DemiEditor
             DeGUIDrag.EndDrag(false);
 //            Event.current.Use();
             Event.current.type = EventType.Used;
+        }
+
+        /// <summary>
+        /// Removes focus from any GUI button/text/element that has focus
+        /// </summary>
+        public static void Deselect()
+        {
+            GUI.FocusControl(null);
         }
 
         /// <summary>
@@ -581,6 +590,36 @@ namespace DG.DemiEditor
                 }
             }
             if (!pressedOverButton && hotControl < 1) _activePressButtonId = -1;
+            return false;
+        }
+
+        /// <summary>
+        /// Draws a button that returns TRUE the first time the mouse moves over it while the mouse button is pressed,
+        /// even if it was pressed outside of the button first
+        /// </summary>
+        public static bool DownButton(Rect rect, string text, GUIStyle guiStyle)
+        { return DownButton(rect, new GUIContent(text, ""), guiStyle); }
+        /// <summary>
+        /// Draws a button that returns TRUE the first time the mouse moves over it while the mouse button is pressed,
+        /// even if it was pressed outside of the button first
+        /// </summary>
+        public static bool DownButton(Rect rect, GUIContent content, GUIStyle guiStyle)
+        {
+            if (GUI.enabled && Event.current.type == EventType.MouseUp && _ActiveDownButtonsIds.Count > 0) {
+                _ActiveDownButtonsIds.Clear();
+                GUIUtility.hotControl = 0;
+                Event.current.Use();
+            }
+            GUI.Button(rect, content, guiStyle);
+            int controlId = DeEditorGUIUtils.GetLastControlId(); // Changed from prev while working on DeInspektor
+            int hotControl = GUIUtility.hotControl;
+            bool mousePressed = GUI.enabled && controlId > 1 && hotControl > 1 && !_ActiveDownButtonsIds.Contains(controlId) && rect.Contains(Event.current.mousePosition);
+            if (mousePressed) {
+                GUIUtility.hotControl = controlId;
+                _ActiveDownButtonsIds.Add(controlId);
+                return true;
+            }
+            if (hotControl < 1) _ActiveDownButtonsIds.Clear();
             return false;
         }
 

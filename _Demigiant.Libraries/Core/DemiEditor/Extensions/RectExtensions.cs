@@ -93,11 +93,53 @@ namespace DG.DemiEditor
         }
 
         /// <summary>
+        /// Returns TRUE if this rect intersects the given one, and also outputs the intersection area<para/>
+        /// </summary>
+        /// <param name="intersection">Intersection area</param>
+        public static bool Intersects(this Rect a, Rect b, out Rect intersection)
+        {
+            intersection = new Rect();
+            if (!a.Overlaps(b)) return false;
+
+            float minX = a.x < b.x ? b.x : a.x;
+            float maxX = a.xMax > b.xMax ? b.xMax : a.xMax;
+            float minY = a.y < b.y ? b.y : a.y;
+            float maxY = a.yMax > b.yMax ? b.yMax : a.yMax;
+            intersection = new Rect(minX, minY, maxX - minX, maxY - minY);
+            return true;
+        }
+
+        /// <summary>
         /// Returns a copy of the Rect with its X/Y coordinates set to 0
         /// </summary>
         public static Rect ResetXY(this Rect r)
         {
             r.x = r.y = 0;
+            return r;
+        }
+
+        /// <summary>
+        /// Sets this rect to the left of the given x position, with options for margin and width resize
+        /// </summary>
+        /// <param name="margin">Distance between this rect and the given x position</param>
+        /// <param name="resizeWidthTo">If greater than zero resizes this rect to the given size</param>
+        public static Rect HangToLeftOf(this Rect r, float x, float margin = 0, float resizeWidthTo = -1)
+        {
+            if (resizeWidthTo > 0) r = r.SetWidth(resizeWidthTo);
+            r.x = x - r.width - margin;
+            return r;
+        }
+
+        /// <summary>
+        /// Sets this rect to the right of the given x position and resizes it so that its xMax remains the same.
+        /// </summary>
+        /// <param name="margin">Distance between this rect and the given x position</param>
+        /// <param name="extraSizeOffset">Extra offset to add to the resulting width</param>
+        public static Rect HangToRightAndResize(this Rect r, float x, float margin = 0, float extraSizeOffset = 0)
+        {
+            float offset = x - r.x;
+            r.width = r.width - offset - margin + extraSizeOffset;
+            r.x = x + margin;
             return r;
         }
 
