@@ -3,7 +3,6 @@
 
 using DG.DeAudio;
 using DG.DeAudioEditor;
-using DG.DeExtensions;
 using DG.DemiLib;
 using UnityEditor;
 using UnityEngine;
@@ -196,7 +195,7 @@ public class DeSamplerInspector : Editor
         }
 
         using (new DeGUILayout.ToolbarScope(DeGUI.styles.toolbar.stickyTop)) {
-            _src.foldoutOpen = DeGUILayout.ToolbarFoldoutButton(_src.foldoutOpen);
+            _src.foldoutOpen = DeGUILayout.ToolbarFoldoutButton(_src.foldoutOpen, GUIContent.none);
         }
         if (_src.foldoutOpen) {
             using (new DeGUILayout.VBoxScope(DeGUI.styles.box.stickyTop)) {

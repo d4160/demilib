@@ -117,10 +117,23 @@ namespace DG.DemiEditor
         /// <summary>
         /// Better implementation of GUI.BeginScrollView.
         /// Returns the modified scrollView struct.<para/>
-        /// Must be closed by a DeGUI.<see cref="EndScrollView"/>.
+        /// Must be closed by a DeGUI.<see cref="EndScrollView"/>.<para/>
+        /// <pre><code>EXAMPLE
+        /// Rect scrollViewArea = ...;
+        /// Rect drawArea = scrollViewArea;
+        /// // Decrease the full drawing area to exclude scrollbars if necessary
+        /// if (_scrollView.fullContentArea.height > scrollViewArea.height) drawArea = drawArea.Shift(0, 0, -11, 0);
+        /// // Begin scrollView
+        /// _scrollView = DeGUI.BeginScrollView(scrollViewArea, _scrollView);
+        /// // Increase scrollView area correctly (or directly set it with SetFullContentHeight
+        /// _scrollView.IncreaseContentHeightBy(...)
+        /// // End
+        /// DeGUI.EndScrollView();
+        /// </code></pre>
         /// </summary>
-        /// <param name="scrollViewArea">Area used by the scrollView</param>
-        /// <param name="scrollView"><see cref="DeScrollView"/> target</param>
+        /// <param name="scrollViewArea">Visible area used by the scrollView</param>
+        /// <param name="scrollView"><see cref="DeScrollView"/> target. You'll need to set its size to the correct full content height
+        /// (either within the Begin/ENd ScrollView calls or before them)</param>
         /// <param name="resetContentHeightToZero">If TRUE (default) resets <see cref="DeScrollView.fullContentArea"/>.height to 0
         /// after beginning the ScrollView</param>
         public static DeScrollView BeginScrollView(Rect scrollViewArea, DeScrollView scrollView, bool resetContentHeightToZero = true)
@@ -202,6 +215,27 @@ namespace DG.DemiEditor
         public static void ShowTexturePreview(Texture2D texture)
         {
             TexturePreviewWindow.Open(texture);
+        }
+
+        /// <summary>
+        /// Gets either black or white, depending on the color that would be most visible on the given one
+        /// </summary>
+        public static Color GetVisibleContentColorOn(Color32 bgColor)
+        {
+            int lum = (int)Math.Sqrt(
+                bgColor.r * bgColor.r * .299 +
+                bgColor.g * bgColor.g * .587 +
+                bgColor.b * bgColor.b * .114
+            );
+            return lum > 130 ? Color.black : Color.white;
+        }
+        /// <summary>
+        /// Gets either black or white, depending on the color that would be most visible on the given one
+        /// </summary>
+        public static Color GetFastVisibleContentColorOn(Color32 bgColor)
+        {
+            // Old faster but obviously not as good method
+            return bgColor.r + bgColor.g + bgColor.b > 1.5f ? Color.black : Color.white;
         }
 
         #endregion
@@ -390,7 +424,12 @@ namespace DG.DemiEditor
                 object defValue = null;
                 for (int i = 0; i < targets.Count; ++i) {
                     if (i == 0) defValue = fInfo.GetValue(targets[i]);
-                    else if (!fInfo.GetValue(targets[i]).Equals(defValue)) return true;
+                    else {
+                        object value = fInfo.GetValue(targets[i]);
+                        if (value == null) {
+                            if (defValue != null) return true;
+                        } else if (!value.Equals(defValue)) return true;
+                    }
                 }
                 return false;
             }
@@ -613,7 +652,10 @@ namespace DG.DemiEditor
             GUI.Button(rect, content, guiStyle);
             int controlId = DeEditorGUIUtils.GetLastControlId(); // Changed from prev while working on DeInspektor
             int hotControl = GUIUtility.hotControl;
-            bool mousePressed = GUI.enabled && controlId > 1 && hotControl > 1 && !_ActiveDownButtonsIds.Contains(controlId) && rect.Contains(Event.current.mousePosition);
+            bool mousePressed = GUI.enabled && controlId > 1 && hotControl > 1
+                                && !_ActiveDownButtonsIds.Contains(controlId) && rect.Contains(Event.current.mousePosition)
+                                // This line makes sure that if a non-down-button element is pressed before this nothing will happen
+                                && (hotControl == controlId || _ActiveDownButtonsIds.Contains(hotControl));
             if (mousePressed) {
                 GUIUtility.hotControl = controlId;
                 _ActiveDownButtonsIds.Add(controlId);
@@ -651,19 +693,19 @@ namespace DG.DemiEditor
 
         /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(Rect rect, bool toggled, string text)
-        { return ToggleButton(rect, toggled, new GUIContent(text, ""), null, null); }
-        /// <summary>Button that can be toggled on and off</summary>
-        public static bool ToggleButton(Rect rect, bool toggled, string text, GUIStyle guiStyle)
-        { return ToggleButton(rect, toggled, new GUIContent(text, ""), null, guiStyle); }
-        /// <summary>Button that can be toggled on and off</summary>
-        public static bool ToggleButton(Rect rect, bool toggled, string text, DeColorPalette colorPalette, GUIStyle guiStyle = null)
-        { return ToggleButton(rect, toggled, new GUIContent(text, ""), colorPalette, guiStyle); }
+        { return ToggleButton(rect, toggled, new GUIContent(text, "")); }
         /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(Rect rect, bool toggled, GUIContent content)
         { return ToggleButton(rect, toggled, content, null, null); }
         /// <summary>Button that can be toggled on and off</summary>
+        public static bool ToggleButton(Rect rect, bool toggled, string text, GUIStyle guiStyle)
+        { return ToggleButton(rect, toggled, new GUIContent(text, ""), guiStyle); }
+        /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(Rect rect, bool toggled, GUIContent content, GUIStyle guiStyle)
         { return ToggleButton(rect, toggled, content, null, guiStyle); }
+        /// <summary>Button that can be toggled on and off</summary>
+        public static bool ToggleButton(Rect rect, bool toggled, string text, DeColorPalette colorPalette, GUIStyle guiStyle = null)
+        { return ToggleButton(rect, toggled, new GUIContent(text, ""), colorPalette, guiStyle); }
         /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(Rect rect, bool toggled, GUIContent content, DeColorPalette colorPalette, GUIStyle guiStyle = null)
         {
@@ -672,10 +714,28 @@ namespace DG.DemiEditor
         }
         /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(Rect rect, bool toggled, string text, Color bgOnColor, Color contentOnColor, GUIStyle guiStyle = null)
-        { return ToggleButton(rect, toggled, new GUIContent(text, ""), DeGUI.colors.bg.toggleOff, bgOnColor, DeGUI.colors.content.toggleOff, contentOnColor, guiStyle); }
+        { return ToggleButton(rect, toggled, new GUIContent(text, ""), bgOnColor, contentOnColor, guiStyle); }
         /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(Rect rect, bool toggled, GUIContent content, Color bgOnColor, Color contentOnColor, GUIStyle guiStyle = null)
         { return ToggleButton(rect, toggled, content, DeGUI.colors.bg.toggleOff, bgOnColor, DeGUI.colors.content.toggleOff, contentOnColor, guiStyle); }
+        /// <summary>Button that can be toggled on and off</summary>
+        public static bool ToggleButton(Rect rect, bool toggled, string text, ToggleColors onColors, GUIStyle guiStyle = null)
+        { return ToggleButton(rect, toggled, new GUIContent(text), onColors, guiStyle); }
+        /// <summary>Button that can be toggled on and off</summary>
+        public static bool ToggleButton(Rect rect, bool toggled, GUIContent content, ToggleColors onColors, GUIStyle guiStyle = null)
+        {
+            DeToggleColors.ColorCombination combo = DeGUI.colors.toggle.GetColors(ToggleColors.DefaultOff, onColors);
+            return ToggleButton(rect, toggled, content, combo.offCols.bg, combo.onCols.bg, combo.offCols.content, combo.onCols.content, guiStyle);
+        }
+        /// <summary>Button that can be toggled on and off</summary>
+        public static bool ToggleButton(Rect rect, bool toggled, string text, ToggleColors offColors, ToggleColors onColors, GUIStyle guiStyle = null)
+        { return ToggleButton(rect, toggled, new GUIContent(text), offColors, onColors, guiStyle); }
+        /// <summary>Button that can be toggled on and off</summary>
+        public static bool ToggleButton(Rect rect, bool toggled, GUIContent content, ToggleColors offColors, ToggleColors onColors, GUIStyle guiStyle = null)
+        {
+            DeToggleColors.ColorCombination combo = DeGUI.colors.toggle.GetColors(offColors, onColors);
+            return ToggleButton(rect, toggled, content, combo.offCols.bg, combo.onCols.bg, combo.offCols.content, combo.onCols.content, guiStyle);
+        }
         /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(Rect rect, bool toggled, GUIContent content, Color bgOffColor, Color bgOnColor, Color contentOffColor, Color contenOnColor, GUIStyle guiStyle = null)
         {
@@ -1190,7 +1250,7 @@ namespace DG.DemiEditor
         public static bool MultiTextArea(Rect rect, string fieldName, IList sources)
         {
             using (var mScope = new MultiPropertyScope(fieldName, sources)) {
-                mScope.value = EditorGUI.TextArea(rect, (string)mScope.fieldInfo.GetValue(sources[0]));
+                mScope.value = EditorGUI.TextArea(rect, (string)mScope.fieldInfo.GetValue(sources[0]), EditorStyles.textArea);
                 return mScope.hasMixedValue;
             }
         }

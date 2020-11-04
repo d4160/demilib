@@ -889,11 +889,15 @@
             Returns the current <see cref="T:DG.DemiEditor.DeScrollView"/> open, or an empty one if none is open.
             </summary>
         </member>
+        <member name="M:DG.DemiEditor.DeScrollView.SetContentWidth(System.Single)">
+            <summary>
+            Sets the <see cref="P:DG.DemiEditor.DeScrollView.fullContentArea"/> width
+            </summary>
+        </member>
         <member name="M:DG.DemiEditor.DeScrollView.SetContentHeight(System.Single)">
             <summary>
             Sets the <see cref="P:DG.DemiEditor.DeScrollView.fullContentArea"/> height
             </summary>
-            <param name="height"></param>
         </member>
         <member name="M:DG.DemiEditor.DeScrollView.IncreaseContentHeightBy(System.Single)">
             <summary>
@@ -904,6 +908,14 @@
         <member name="M:DG.DemiEditor.DeScrollView.GetSingleLineRect(System.Single,System.Boolean)">
             <summary>
             Returns a Rect for a single line at the current scrollView yMax
+            </summary>
+            <param name="height">If less than 0 uses default line height, otherwise the value passed</param>
+            <param name="increaseScrollViewHeight">if TRUE (default) automatically increases the height of the <see cref="P:DG.DemiEditor.DeScrollView.fullContentArea"/> accordingly</param>
+            <returns></returns>
+        </member>
+        <member name="M:DG.DemiEditor.DeScrollView.GetWideSingleLineRect(System.Single,System.Boolean)">
+            <summary>
+            Returns a Rect for a single line at the current scrollView yMax, as wide as the max visible rect width
             </summary>
             <param name="height">If less than 0 uses default line height, otherwise the value passed</param>
             <param name="increaseScrollViewHeight">if TRUE (default) automatically increases the height of the <see cref="P:DG.DemiEditor.DeScrollView.fullContentArea"/> accordingly</param>
@@ -1300,19 +1312,22 @@
         <member name="M:DG.DemiEditor.DeGUILayout.ToolbarFoldoutButton(System.Boolean,System.String,System.Boolean,System.Boolean,System.Nullable{UnityEngine.Color})">
             <summary>Toolbar foldout button</summary>
         </member>
+        <member name="M:DG.DemiEditor.DeGUILayout.ToolbarFoldoutButton(System.Boolean,UnityEngine.GUIContent,System.Boolean,System.Boolean,System.Nullable{UnityEngine.Color})">
+            <summary>Toolbar foldout button</summary>
+        </member>
         <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,System.String,UnityEngine.GUILayoutOption[])">
-            <summary>Button that can be toggled on and off</summary>
-        </member>
-        <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,System.String,UnityEngine.GUIStyle,UnityEngine.GUILayoutOption[])">
-            <summary>Button that can be toggled on and off</summary>
-        </member>
-        <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,System.String,DG.DemiLib.DeColorPalette,UnityEngine.GUIStyle,UnityEngine.GUILayoutOption[])">
             <summary>Button that can be toggled on and off</summary>
         </member>
         <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,UnityEngine.GUIContent,UnityEngine.GUILayoutOption[])">
             <summary>Button that can be toggled on and off</summary>
         </member>
+        <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,System.String,UnityEngine.GUIStyle,UnityEngine.GUILayoutOption[])">
+            <summary>Button that can be toggled on and off</summary>
+        </member>
         <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,UnityEngine.GUIContent,UnityEngine.GUIStyle,UnityEngine.GUILayoutOption[])">
+            <summary>Button that can be toggled on and off</summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,System.String,DG.DemiLib.DeColorPalette,UnityEngine.GUIStyle,UnityEngine.GUILayoutOption[])">
             <summary>Button that can be toggled on and off</summary>
         </member>
         <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,UnityEngine.GUIContent,DG.DemiLib.DeColorPalette,UnityEngine.GUIStyle,UnityEngine.GUILayoutOption[])">
@@ -1322,6 +1337,18 @@
             <summary>Button that can be toggled on and off</summary>
         </member>
         <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,UnityEngine.GUIContent,UnityEngine.Color,UnityEngine.Color,UnityEngine.GUIStyle,UnityEngine.GUILayoutOption[])">
+            <summary>Button that can be toggled on and off</summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,System.String,DG.DemiLib.ToggleColors,UnityEngine.GUIStyle,UnityEngine.GUILayoutOption[])">
+            <summary>Button that can be toggled on and off</summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,UnityEngine.GUIContent,DG.DemiLib.ToggleColors,UnityEngine.GUIStyle,UnityEngine.GUILayoutOption[])">
+            <summary>Button that can be toggled on and off</summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,System.String,DG.DemiLib.ToggleColors,DG.DemiLib.ToggleColors,UnityEngine.GUIStyle,UnityEngine.GUILayoutOption[])">
+            <summary>Button that can be toggled on and off</summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,UnityEngine.GUIContent,DG.DemiLib.ToggleColors,DG.DemiLib.ToggleColors,UnityEngine.GUIStyle,UnityEngine.GUILayoutOption[])">
             <summary>Button that can be toggled on and off</summary>
         </member>
         <member name="M:DG.DemiEditor.DeGUILayout.ToggleButton(System.Boolean,UnityEngine.GUIContent,UnityEngine.Color,UnityEngine.Color,UnityEngine.Color,UnityEngine.Color,UnityEngine.GUIStyle,UnityEngine.GUILayoutOption[])">
@@ -1528,10 +1555,23 @@
             <summary>
             Better implementation of GUI.BeginScrollView.
             Returns the modified scrollView struct.<para/>
-            Must be closed by a DeGUI.<see cref="M:DG.DemiEditor.DeGUI.EndScrollView"/>.
+            Must be closed by a DeGUI.<see cref="M:DG.DemiEditor.DeGUI.EndScrollView"/>.<para/>
+            <pre><code>EXAMPLE
+            Rect scrollViewArea = ...;
+            Rect drawArea = scrollViewArea;
+            // Decrease the full drawing area to exclude scrollbars if necessary
+            if (_scrollView.fullContentArea.height > scrollViewArea.height) drawArea = drawArea.Shift(0, 0, -11, 0);
+            // Begin scrollView
+            _scrollView = DeGUI.BeginScrollView(scrollViewArea, _scrollView);
+            // Increase scrollView area correctly (or directly set it with SetFullContentHeight
+            _scrollView.IncreaseContentHeightBy(...)
+            // End
+            DeGUI.EndScrollView();
+            </code></pre>
             </summary>
-            <param name="scrollViewArea">Area used by the scrollView</param>
-            <param name="scrollView"><see cref="T:DG.DemiEditor.DeScrollView"/> target</param>
+            <param name="scrollViewArea">Visible area used by the scrollView</param>
+            <param name="scrollView"><see cref="T:DG.DemiEditor.DeScrollView"/> target. You'll need to set its size to the correct full content height
+            (either within the Begin/ENd ScrollView calls or before them)</param>
             <param name="resetContentHeightToZero">If TRUE (default) resets <see cref="P:DG.DemiEditor.DeScrollView.fullContentArea"/>.height to 0
             after beginning the ScrollView</param>
         </member>
@@ -1570,6 +1610,16 @@
         <member name="M:DG.DemiEditor.DeGUI.ShowTexturePreview(UnityEngine.Texture2D)">
             <summary>
             Opens a panel that previews the given texture (if not NULL)
+            </summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeGUI.GetVisibleContentColorOn(UnityEngine.Color32)">
+            <summary>
+            Gets either black or white, depending on the color that would be most visible on the given one
+            </summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeGUI.GetFastVisibleContentColorOn(UnityEngine.Color32)">
+            <summary>
+            Gets either black or white, depending on the color that would be most visible on the given one
             </summary>
         </member>
         <member name="T:DG.DemiEditor.DeGUI.CursorColorScope">
@@ -1687,16 +1737,16 @@
         <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,System.String)">
             <summary>Button that can be toggled on and off</summary>
         </member>
-        <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,System.String,UnityEngine.GUIStyle)">
-            <summary>Button that can be toggled on and off</summary>
-        </member>
-        <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,System.String,DG.DemiLib.DeColorPalette,UnityEngine.GUIStyle)">
-            <summary>Button that can be toggled on and off</summary>
-        </member>
         <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,UnityEngine.GUIContent)">
             <summary>Button that can be toggled on and off</summary>
         </member>
+        <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,System.String,UnityEngine.GUIStyle)">
+            <summary>Button that can be toggled on and off</summary>
+        </member>
         <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,UnityEngine.GUIContent,UnityEngine.GUIStyle)">
+            <summary>Button that can be toggled on and off</summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,System.String,DG.DemiLib.DeColorPalette,UnityEngine.GUIStyle)">
             <summary>Button that can be toggled on and off</summary>
         </member>
         <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,UnityEngine.GUIContent,DG.DemiLib.DeColorPalette,UnityEngine.GUIStyle)">
@@ -1706,6 +1756,18 @@
             <summary>Button that can be toggled on and off</summary>
         </member>
         <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,UnityEngine.GUIContent,UnityEngine.Color,UnityEngine.Color,UnityEngine.GUIStyle)">
+            <summary>Button that can be toggled on and off</summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,System.String,DG.DemiLib.ToggleColors,UnityEngine.GUIStyle)">
+            <summary>Button that can be toggled on and off</summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,UnityEngine.GUIContent,DG.DemiLib.ToggleColors,UnityEngine.GUIStyle)">
+            <summary>Button that can be toggled on and off</summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,System.String,DG.DemiLib.ToggleColors,DG.DemiLib.ToggleColors,UnityEngine.GUIStyle)">
+            <summary>Button that can be toggled on and off</summary>
+        </member>
+        <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,UnityEngine.GUIContent,DG.DemiLib.ToggleColors,DG.DemiLib.ToggleColors,UnityEngine.GUIStyle)">
             <summary>Button that can be toggled on and off</summary>
         </member>
         <member name="M:DG.DemiEditor.DeGUI.ToggleButton(UnityEngine.Rect,System.Boolean,UnityEngine.GUIContent,UnityEngine.Color,UnityEngine.Color,UnityEngine.Color,UnityEngine.Color,UnityEngine.GUIStyle)">

@@ -139,23 +139,26 @@ namespace DG.DemiEditor
 
         /// <summary>Toolbar foldout button</summary>
         public static bool ToolbarFoldoutButton(bool toggled, string text = null, bool isLarge = false, bool stretchedLabel = false, Color? forceLabelColor = null)
+        { return ToolbarFoldoutButton(toggled, string.IsNullOrEmpty(text) ? GUIContent.none : new GUIContent(text), isLarge, stretchedLabel, forceLabelColor); }
+        /// <summary>Toolbar foldout button</summary>
+        public static bool ToolbarFoldoutButton(bool toggled, GUIContent guiContent = null, bool isLarge = false, bool stretchedLabel = false, Color? forceLabelColor = null)
         {
             GUIStyle style;
             if (isLarge) {
-                style = string.IsNullOrEmpty(text)
+                style = guiContent == null
                     ? toggled ? DeGUI.styles.button.toolLFoldoutOpen : DeGUI.styles.button.toolLFoldoutClosed
                     : toggled
                         ? stretchedLabel ? DeGUI.styles.button.toolLFoldoutOpenWStretchedLabel : DeGUI.styles.button.toolLFoldoutOpenWLabel
                         : stretchedLabel ? DeGUI.styles.button.toolLFoldoutClosedWStretchedLabel : DeGUI.styles.button.toolLFoldoutClosedWLabel;
             } else {
-                style = string.IsNullOrEmpty(text)
+                style = guiContent == null
                     ? toggled ? DeGUI.styles.button.toolFoldoutOpen : DeGUI.styles.button.toolFoldoutClosed
                     : toggled
                         ? stretchedLabel ? DeGUI.styles.button.toolFoldoutOpenWStretchedLabel : DeGUI.styles.button.toolFoldoutOpenWLabel
                         : stretchedLabel ? DeGUI.styles.button.toolFoldoutClosedWStretchedLabel : DeGUI.styles.button.toolFoldoutClosedWLabel;
             }
             if (forceLabelColor != null) style = style.Clone((Color)forceLabelColor);
-            bool clicked = GUILayout.Button(text, style);
+            bool clicked = GUILayout.Button(guiContent == null ? GUIContent.none : guiContent, style);
             if (clicked) {
                 toggled = !toggled;
                 GUI.changed = true;
@@ -167,17 +170,18 @@ namespace DG.DemiEditor
         public static bool ToggleButton(bool toggled, string text, params GUILayoutOption[] options)
         { return ToggleButton(toggled, new GUIContent(text, ""), null, null, options); }
         /// <summary>Button that can be toggled on and off</summary>
-        public static bool ToggleButton(bool toggled, string text, GUIStyle guiStyle, params GUILayoutOption[] options)
-        { return ToggleButton(toggled, new GUIContent(text, ""), null, guiStyle, options); }
-        /// <summary>Button that can be toggled on and off</summary>
-        public static bool ToggleButton(bool toggled, string text, DeColorPalette colorPalette, GUIStyle guiStyle = null, params GUILayoutOption[] options)
-        { return ToggleButton(toggled, new GUIContent(text, ""), colorPalette, guiStyle, options); }
-        /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(bool toggled, GUIContent content, params GUILayoutOption[] options)
         { return ToggleButton(toggled, content, null, null, options); }
         /// <summary>Button that can be toggled on and off</summary>
+        public static bool ToggleButton(bool toggled, string text, GUIStyle guiStyle, params GUILayoutOption[] options)
+        { return ToggleButton(toggled, new GUIContent(text, ""), null, guiStyle, options); }
+        
+        /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(bool toggled, GUIContent content, GUIStyle guiStyle, params GUILayoutOption[] options)
         { return ToggleButton(toggled, content, null, guiStyle, options); }
+        /// <summary>Button that can be toggled on and off</summary>
+        public static bool ToggleButton(bool toggled, string text, DeColorPalette colorPalette, GUIStyle guiStyle = null, params GUILayoutOption[] options)
+        { return ToggleButton(toggled, new GUIContent(text, ""), colorPalette, guiStyle, options); }
         /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(bool toggled, GUIContent content, DeColorPalette colorPalette, GUIStyle guiStyle = null, params GUILayoutOption[] options)
         {
@@ -186,10 +190,28 @@ namespace DG.DemiEditor
         }
         /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(bool toggled, string text, Color bgOnColor, Color contentOnColor, GUIStyle guiStyle = null, params GUILayoutOption[] options)
-        { return ToggleButton(toggled, new GUIContent(text, ""), DeGUI.colors.bg.toggleOff, bgOnColor, DeGUI.colors.content.toggleOff, contentOnColor, guiStyle, options); }
+        { return ToggleButton(toggled, new GUIContent(text, ""), bgOnColor, contentOnColor, guiStyle, options); }
         /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(bool toggled, GUIContent content, Color bgOnColor, Color contentOnColor, GUIStyle guiStyle = null, params GUILayoutOption[] options)
         { return ToggleButton(toggled, content, DeGUI.colors.bg.toggleOff, bgOnColor, DeGUI.colors.content.toggleOff, contentOnColor, guiStyle, options); }
+        /// <summary>Button that can be toggled on and off</summary>
+        public static bool ToggleButton(bool toggled, string text, ToggleColors onColors,  GUIStyle guiStyle = null, params GUILayoutOption[] options)
+        { return ToggleButton(toggled, new GUIContent(text), onColors, guiStyle, options); }
+        /// <summary>Button that can be toggled on and off</summary>
+        public static bool ToggleButton(bool toggled, GUIContent content, ToggleColors onColors,  GUIStyle guiStyle = null, params GUILayoutOption[] options)
+        {
+            DeToggleColors.ColorCombination combo = DeGUI.colors.toggle.GetColors(ToggleColors.DefaultOff, onColors);
+            return ToggleButton(toggled, content, combo.offCols.bg, combo.onCols.bg, combo.offCols.content, combo.onCols.content, guiStyle, options);
+        }
+        /// <summary>Button that can be toggled on and off</summary>
+        public static bool ToggleButton(bool toggled, string text, ToggleColors offColors, ToggleColors onColors,  GUIStyle guiStyle = null, params GUILayoutOption[] options)
+        { return ToggleButton(toggled, new GUIContent(text), offColors, onColors, guiStyle, options); }
+        /// <summary>Button that can be toggled on and off</summary>
+        public static bool ToggleButton(bool toggled, GUIContent content, ToggleColors offColors, ToggleColors onColors,  GUIStyle guiStyle = null, params GUILayoutOption[] options)
+        {
+            DeToggleColors.ColorCombination combo = DeGUI.colors.toggle.GetColors(offColors, onColors);
+            return ToggleButton(toggled, content, combo.offCols.bg, combo.onCols.bg, combo.offCols.content, combo.onCols.content, guiStyle, options);
+        }
         /// <summary>Button that can be toggled on and off</summary>
         public static bool ToggleButton(bool toggled, GUIContent content, Color bgOffColor, Color bgOnColor, Color contentOffColor, Color contenOnColor, GUIStyle guiStyle = null, params GUILayoutOption[] options)
         {
